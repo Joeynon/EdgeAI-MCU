@@ -128,11 +128,18 @@
     * 整合多媒體影音框架，結合 `Camera_2_Lcd_JPEGDEC` 實現相機影格擷取與 TFT LCD 畫面同步解碼渲染。
     * 調用 `GenAIVisionTTS` 機制，透過網路發送 HTTP POST 請求，將擷取的 JPEG 照片二進位數據上傳至雲端 Vision LLM 終端，並在提示詞參數中設定特定的**情緒音樂映射規則**（Analyze emotion... Respond in format: 'Emotion: [emotion], Song: [filename.mp3]'）。
     * 接收雲端大模型回傳之格式化文字，經由字串解析函數切開取得對應檔名（如 `APT.mp3`），隨後調用板載音訊解碼驅動，讀取 SD 卡中對應之 MP3 檔案，經由音訊腳位與外接喇叭完成智慧體聲音輸出。
-* **流程圖文字描述**:
-    1. **多媒體架構啟動**：初始化影音串流配置 $\rightarrow$ 掛載儲存 MP3 聲音檔之 SD 卡 $\rightarrow$ 連接網路。
-    2. **影像捕捉與即時預覽**：觸發相機快門 $\rightarrow$ 影像寫入記憶體快取，同時利用 JPEG 解碼器將影像呈現在 TFT 螢幕上。
-    3. **多模態大模型請求**：封裝影像數據與硬編碼 Prompt 提示詞 $\rightarrow$ 發送 HTTP 請求至雲端大模型終端 $\rightarrow$ 保持非阻塞/阻塞等待推論回傳。
-    4. **硬體音訊執行**：接收大模型回應字串 $\rightarrow$ 解析出關鍵字 `Song: filename.mp3` $\rightarrow$ 呼叫音訊檔案系統開啟 SD 卡中指定歌曲 $\rightarrow$ 經由硬體 DAC 轉換由外接喇叭進行音效播放。
+* **流程圖描述**:
+flowchart TD
+    Start[啟動 DHT11 感測器核心通訊] --> StartWiFi[開啟 Wi-Fi 連線並指派固定網頁 IP 位址]
+    StartWiFi --> StartListen[啟動 Port 80 HTTP 監聽服務]
+    StartListen --> WaitClient[Loop: 等待手機客戶端網頁連線請求]
+    WaitClient --> TriggerDHT[當請求到達，MCU 向 GPIO Pin 8 發送起始脈衝訊號]
+    TriggerDHT --> Read40Bit[精準讀取 DHT11 回傳的 40-bit 溫濕度數位序列資料]
+    Read40Bit --> CheckCRC[進行 Checksum 校驗碼檢查確認數據無誤]
+    CheckCRC -- 失敗 --> ErrPage[發送數據錯誤網頁標題] --> WaitClient
+    CheckCRC -- 成功 --> ConcatHTML[調用字串拼接將浮點數溫濕度與體感溫度嵌入 HTML 模板]
+    ConcatHTML --> SendPage[透過 TCP 網路 client.println 將動態網頁回傳手機瀏覽器]
+    SendPage --> CloseConn[關閉目前連接] --> WaitClient
 * **成果展現**:  
     ![GenAIVisionTTS 硬體成果圖](hw8.jpg)
 
